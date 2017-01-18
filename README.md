@@ -1,2 +1,2 @@
 # mobi
-meteorological data analysis
+Meteorological data analysis made in RStudio
