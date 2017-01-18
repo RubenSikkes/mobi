@@ -1,0 +1,317 @@
+---
+title: "Mobiquity Metereological Dataset"
+author: "Ruben Sikkes"
+output: html_notebook
+---
+
+First loading the dataset. 
+
+```{r}
+meteo <- read.csv("Meteorology.csv",header=TRUE, sep = ";")
+meteo = as.data.frame(meteo)
+meteo
+summary(meteo)
+```
+
+```{r}
+dim(meteo)
+```
+6 different variables. What do they mean?
+
+Month and day are self explanatory.
+Wind:
+Temperature: In fahrenheit assumingly so changing to celsius would be °C = (°F - 32) / 1.8
+Radiation:
+Ozone.Concentration:  in µg/m3
+
+```{r}
+library(data.table)
+setnames(meteo, "Temperature", "Temperature.F" )
+meteo$Temperature.C <- round((meteo$Temperature.F- 32) / 1.8, digits=0)
+meteo
+```
+
+```{r}
+library(ggplot2)
+ggplot(meteo, aes(x=Day, y=Temperature.C, color=as.factor(Month)))+
+  geom_smooth(method ="lm",
+               formula = y ~ log(x), #zorgt voor kromming
+               se = FALSE, )+ 
+  theme_light() + 
+  scale_colour_discrete(name="Month",
+                      breaks=c("5","6","7","8","9"),
+                      labels=c("May", "June", "July", "Aug", "Sept"))+
+  scale_x_continuous(name = "Days of the Month",
+                     limits = c(0, 30),
+                     breaks = seq(0, 31, by = 3))+
+  scale_y_continuous(name = "Temperature (°C)",
+                     limits = c(0, 36),
+                     breaks = seq(0, 36, by = 3))+
+  ggtitle("Change of Temperature in °C per Month")
+```
+So temperature is highest in July and August. 
+```{r}
+ggplot(meteo, aes(x=Day, y=Wind, color=as.factor(Month)))+
+  geom_smooth(method ="lm",
+               formula = y ~ log(x), #zorgt voor kromming
+               se = FALSE, )+ 
+  theme_light() + 
+  scale_colour_discrete(name="Month",
+                      breaks=c("5","6","7","8","9"),
+                      labels=c("May", "June", "July", "Aug", "Sept"))+
+  scale_x_continuous(name = "Days of the Month",
+                     limits = c(0, 30),
+                     breaks = seq(0, 31, by = 3))+
+  scale_y_continuous(name = "Wind",
+                     limits = c(0, 12),
+                     breaks = seq(0, 12, by = 3))+
+  ggtitle("Change of wind per Month")
+```
+Wind speeds are slightly lower during June-Aug
+
+```{r}
+ggplot(meteo, aes(x=Day, y=Radiation, color=as.factor(Month)))+
+  geom_smooth(method ="lm",
+               formula = y ~ log(x), #zorgt voor kromming
+               se = FALSE, )+ 
+  theme_light() + 
+  scale_colour_discrete(name="Month",
+                      breaks=c("5","6","7","8","9"),
+                      labels=c("May", "June", "July", "Aug", "Sept"))+
+  scale_x_continuous(name = "Days of the Month",
+                     limits = c(0, 30),
+                     breaks = seq(0, 31, by = 3))+
+  scale_y_continuous(name = "Radiation",
+                     limits = c(0, 350),
+                     breaks = seq(0, 350, by = 50))+
+  ggtitle("Change of Radiation per Month")
+```
+Radiation does not seem to be very different ??
+
+```{r}
+ggplot(meteo, aes(x=Day, y=Ozone.concentration, color=as.factor(Month)))+
+  geom_smooth(method ="lm",
+               formula = y ~ log(x), #zorgt voor kromming
+               se = FALSE, )+ 
+  theme_light() + 
+  scale_colour_discrete(name="Month",
+                      breaks=c("5","6","7","8","9"),
+                      labels=c("May", "June", "July", "Aug", "Sept"))+
+  scale_x_continuous(name = "Days of the Month",
+                     limits = c(0, 30),
+                     breaks = seq(0, 31, by = 3))+
+  scale_y_continuous(name = "Ozone Concentration",
+                    limits = c(0, 100),
+                     breaks = seq(0, 100, by = 10))+
+  ggtitle("Change of Ozone concentration per Month")
+```
+Seems to be higher during July and August. 
+
+So during the summer (july and august), Ozone concentrations, temperatures and Radiation levels rise and wind speeds seem to be lower on average.  Based on the previous plots Ozone, radiation and temperature should be positively correlated and wind negatively.
+
+Are there any correlations between variables?
+```{r}
+small_matrix = data.frame(Wind= meteo$Wind,
+                        Temp= meteo$Temperature.C,
+                        Ozone = meteo$Ozone.concentration,
+                        Radiation = meteo$Radiation
+                      )
+
+library('corrplot') #package corrplot
+cor_matrix = cor(small_matrix, use="complete.obs")
+corrplot.mixed(cor_matrix)
+```
+Temperature and wind, Ozone and wind, and Temp and ozone seem to show highest correlations. As predicted wind has a negative correlation while ozone, radiation and temperature are positively correlated. 
+
+The positive correlation between ozone concentration and temperature can be seen in the next plot.
+
+```{r}
+ggplot(meteo, aes(x=X, y= Ozone.concentration, colour= Temperature.C))+ geom_point()+ geom_smooth(se = FALSE,)+  
+               scale_color_continuous(name="Temperature in °C",
+                         breaks = c(15, 20, 25,30,35),
+                         labels = c("15", "20", "25","30", "35"),
+                         low = "blue", high = "red")+
+  labs(title="Ozone Concentration increases during the Summer",
+       x=  "Day (1 = 1st of May)",
+       y= "Ozone Concentration") + theme_minimal()
+```
+It seems that the Ozone concentration and temperature increase during the summer. Does Ozone cause this increase or is it simply correlation? What does ozone concentration mean?
+
+```{r}
+ggplot(meteo, aes(x=Ozone.concentration, y= Temperature.C))+ geom_point()+ geom_smooth(se = FALSE,)+   
+  labs(title="Ozone Concentration increases during the Summer",
+       x=  "Ozone Concentration",
+       y= "Temperature") + theme_minimal()
+
+cor.test(meteo$Ozone.concentration, meteo$Temperature.C, use="complete.obs")
+```
+The correlation between Ozone concentration and temperature becomes quite obvious when looking at this plot. Browsing wikipedia the interaction between temperature and ozone is explained through plants:
+"Ozone production rises during heat waves, because plants absorb less ozone". An increase in Temperature therefore seems to cause an increase in Ozone. 
+
+```{r}
+ggplot(meteo, aes(x=X, y= Radiation, colour= Temperature.C))+ geom_point()+
+  geom_smooth(se = FALSE,)+  
+               scale_color_continuous(name="Temperature in °C",
+                         breaks = c(15, 20, 25,30,35),
+                         labels = c("15", "20", "25","30", "35"),
+                         low = "blue", high = "red")+
+  labs(title="Radiation fairly constant during the Summer",
+       x=  "Day (1 = 1st of May)",
+       y= "Radiation") + theme_minimal()
+
+cor.test(meteo$Radiation, meteo$Temperature.C, use="complete.obs")
+```
+The temperature increases but radiation stays fairly constant.
+```{r}
+ggplot(meteo, aes(x=Radiation, y= Temperature.C))+ geom_point()+ 
+  geom_smooth(method= "lm",
+              se = FALSE,)+   
+  labs(title="As Radiation increases Temperature on average increases",
+       x=  "Radiation",
+       y= "Temperature") + theme_minimal()
+```
+
+In the correlation plot a negative correlation between wind and ozone was also found. 
+
+```{r}
+ggplot(meteo, aes(x=Wind, y= Ozone.concentration, colour= Temperature.C))+ geom_point()+ geom_smooth(se = FALSE,)+  
+               scale_color_continuous(name="Temperature in °C",
+                         breaks = c(15, 20, 25,30,35),
+                         labels = c("15", "20", "25","30", "35"),
+                         low = "blue", high = "red")+
+  labs(title="Higher wind speeds result in lower Ozone levels ",
+       x=  "Wind speeds",
+       y= "Ozone Concentration") + theme_minimal()
+```
+Can probably be explained by the fact that wind causes a better spread of ozone particles through the air. 
+
+```{r}
+ggplot(meteo, aes(x=Ozone.concentration, y= Radiation, colour= Temperature.C))+ geom_point()+ geom_smooth(se = FALSE,)+  
+               scale_color_continuous(name="Temperature in °C",
+                         breaks = c(15, 20, 25,30,35),
+                         labels = c("15", "20", "25","30", "35"),
+                         low = "blue", high = "red")+
+  labs(title="Relation between Radiation and Ozone concentrations",
+       x=  "Ozone Concentration",
+       y= "Radiation") + theme_minimal()
+```
+The highest temperatures are achieved when they are both high. Could it be that higher radiation causes more chemical reactions that form Ozone? Highest Radiation values are however not co-occuring with high ozone concentrations nor temperatures.
+
+```{r}
+ggplot(meteo, aes(x=Wind, y= Temperature.C))+ geom_point()+ geom_smooth(se = FALSE,)+  
+  labs(title="Relation between Wind and Temperature",
+       x=  "Wind",
+       y= "Temperature") + theme_minimal()
+```
+As wind increases, temperatures are on average lower. This could be because high winds usually co-occur with bad weather or depressions which lower temperatures.
+
+How does wind mix in? Making a difference between low medium and high wind speeds. Assuming the values stand for m/s as the most common values are around 10 and extremes are 1.7 and 20.7. Wikipedia explains these values as:
+below 5.5 m/s is less than a "gentle breeze (some leaves moving)" while above 14.8 is "high wind with moderate gale (whole trees in motion)".  
+
+  - source; https://en.wikipedia.org/wiki/Beaufort_scale
+
+```{r}
+ggplot(meteo, aes(x= Wind)) + geom_density() + geom_vline(xintercept = 5.5) + geom_vline(xintercept=14.8)
+library(plyr)
+count(meteo, "wind_cat")
+```
+
+```{r}
+lb = 5.5
+hb = 14.8
+#Making 3 categories for low/medium/high wind speeds 
+for (i in 1:length(meteo$Wind)){
+  if(meteo$Wind[i] <= lb){
+  meteo$wind_cat[i]= 1
+  }
+  else {
+    if (meteo$Wind[i] >= hb){
+    meteo$wind_cat[i] = 3
+    }
+    else {
+       meteo$wind_cat[i] = 2
+    }
+  }
+}
+meteo$wind_cat <- as.factor(meteo$wind_cat)
+```
+
+In the netherlands we also use wind categories to indicate storms. When making a distinction in 3 different wind categories the correlation between wind and temperature becomes clear. 
+```{r}
+ggplot(meteo, aes(x=Day, y= Temperature.C, colour= wind_cat))+ geom_point()+ 
+  geom_smooth(se = FALSE,)+
+  labs(title="Relation between Wind categories and Temperature",
+       x=  "Day",
+       y= "Temperature") + theme_minimal() + 
+  scale_color_manual(name="Wind \nCategories",
+                         values = c("#28AADC",
+                                    "#248E84",
+                                    "#96503F"),
+                     labels = c("Low ","Med","High"))
+  
+```
+
+
+And because wind affects ozone concentration how does a plot including ozone, temp and wind look?
+```{r}
+ggplot(meteo, aes(x=Ozone.concentration, y= Temperature.C, colour=wind_cat))+ geom_point()+  
+  labs(title="Relation between Ozone concentrations and Temperature", x= "Ozone Concentration", y= "Temperature (°C)") + theme_minimal()+
+  scale_color_manual(name="Wind \nCategories",
+                         values = c("Green",
+                                    "cyan",
+                                    "Red"),
+                     labels = c("Low ","Med","High"))
+  
+```
+This plot nicely shows that the most extreme temperature and ozone concentrations are reached when winds are below 5.5 (m/s). Lowest temperatures and ozone concentrations are reached when winds are above 14.8 (m/s).
+
+Doing the same for different radiation categories?
+```{r}
+ggplot(meteo, aes(x= Radiation)) + geom_density() + geom_vline(xintercept = 150) + geom_vline(xintercept=280)
+```
+```{r}
+lbr = 50
+hbr = 270
+#Making 3 categories for low/medium/high wind speeds 
+meteo$rad_cat <- 2 #standaard als gemiddelde sterkte
+
+for (i in 1:length(meteo$Radiation)){
+  if (is.na(meteo$Radiation[i])){
+    meteo$rad_cat[i]= 0
+  }
+  else {
+    if(meteo$Radiation[i] <= lbr){
+      meteo$rad_cat[i]= 1
+      }
+    if (meteo$Radiation[i] >= hbr){
+      meteo$rad_cat[i] = 3
+      }
+  }
+}
+meteo$rad_cat <- as.factor(meteo$rad_cat)
+
+count(meteo, "rad_cat")
+meteo
+```
+```{r}
+
+```
+
+
+
+```{r}
+ggplot(meteo, aes(x=Ozone.concentration, y= Temperature.C, colour=rad_cat))+ geom_point()+ 
+  labs(title="Relation between Ozone concentrations and Temperature", x= "Ozone Concentration", y= "Temperature (°C)") + theme_minimal()+
+  scale_color_manual(name="Radiation \nCategories",
+                         values = c("white","Green",
+                                    "cyan",
+                                    "Red"),
+                     labels = c("0","Low ","Med","High"))
+```
+Low Radiation category (<50) results in lower Ozone concentration but high does not result in higher values per ce. There are however 42 rows where either concentration or radiation is missing which is 27% and quite a lot for such a small dataset. 
+```{r}
+missing = sum(is.na(meteo$Ozone.concentration) | is.na(meteo$Radiation))
+missing_p= 42/length(meteo$Ozone.concentration)*100
+missing_p
+```
+
